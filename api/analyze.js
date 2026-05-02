@@ -32,7 +32,7 @@ Flags: green = safe/natural, yellow = use in moderation / mild concern, red = ha
 If the input contains an image, extract the ingredient list from it first, then analyze.
 Be thorough, science-backed, and accurate. Return only raw JSON — no markdown fences.`;
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // Handle CORS preflight
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
