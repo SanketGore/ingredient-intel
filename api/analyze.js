@@ -29,42 +29,7 @@ Return this exact structure:
 }
 
 Flags: green = safe/natural, yellow = use in moderation / mild concern, red = harmful / avoid.
-If the input contains an image, extract the ingredient list from it first, then analyze.
 Be thorough, science-backed, and accurate. Return only raw JSON — no markdown fences.`;
-
-const MODELS = [
-  { name: "gemma-3-27b-it",   label: "Gemma 3 27B"      },
-  { name: "gemini-2.0-flash", label: "Gemini 2.0 Flash" }
-];
-
-async function callModel(modelName, parts, apiKey) {
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        contents: [{ role: "user", parts: parts }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          temperature: 0.2,
-          maxOutputTokens: 2048
-        }
-      })
-    }
-  );
-
-  const data = await response.json();
-
-  if (!response.ok || data.error) {
-    throw new Error(data.error?.message || `Model ${modelName} returned status ${response.status}`);
-  }
-
-  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-  const clean   = rawText.replace(/```json|```/g, "").trim();
-  return { result: JSON.parse(clean), usedModel: modelName };
-}
 
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -73,36 +38,49 @@ module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST")   return res.status(405).json({ error: "Method not allowed" });
 
-  // ── Diagnostic check — confirms if env variable is present ──
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({
-      error: "MISSING_API_KEY: GEMINI_API_KEY environment variable is not set in Vercel."
+    return res.status(500).json({ error: "MISSING_API_KEY: GROQ_API_KEY is not set in Vercel." });
+  }
+
+  const { text } = req.body;
+  if (!text || !text.trim()) {
+    return res.status(400).json({ error: "No ingredient text provided." });
+  }
+
+  try {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "gemma2-9b-it",
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user",   content: `Analyze these ingredients:\n\n${text}` }
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.2,
+        max_tokens: 2048
+      })
     });
-  }
 
-  const { parts } = req.body;
-  if (!parts || !Array.isArray(parts) || parts.length === 0) {
-    return res.status(400).json({ error: "No input provided" });
-  }
+    const data = await response.json();
 
-  let lastError = null;
-
-  for (const model of MODELS) {
-    try {
-      console.log(`Trying model: ${model.label}`);
-      const { result, usedModel } = await callModel(model.name, parts, apiKey);
-      console.log(`Success with: ${model.label}`);
-      result._modelUsed = usedModel;
-      return res.status(200).json(result);
-    } catch (err) {
-      console.warn(`${model.label} failed: ${err.message}`);
-      lastError = err;
+    if (!response.ok || data.error) {
+      throw new Error(data.error?.message || `Groq returned status ${response.status}`);
     }
-  }
 
-  console.error("All models failed:", lastError?.message);
-  return res.status(500).json({
-    error: `API_ERROR: ${lastError?.message || "All models failed. Please try again."}`
-  });
+    const raw    = data.choices?.[0]?.message?.content || "{}";
+    const clean  = raw.replace(/```json|```/g, "").trim();
+    const parsed = JSON.parse(clean);
+    parsed._modelUsed = "gemma2-9b-it (Groq)";
+
+    return res.status(200).json(parsed);
+  } catch (err) {
+    console.error("Handler error:", err.message);
+    return res.status(500).json({ error: `API_ERROR: ${err.message}` });
+  }
 };
