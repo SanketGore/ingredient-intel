@@ -56,7 +56,7 @@ module.exports = async function handler(req, res) {
         "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "gemma2-9b-it",
+        model: "llama-3.1-8b-instant",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user",   content: `Analyze these ingredients:\n\n${text}` }
@@ -76,7 +76,7 @@ module.exports = async function handler(req, res) {
     const raw    = data.choices?.[0]?.message?.content || "{}";
     const clean  = raw.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(clean);
-    parsed._modelUsed = "gemma2-9b-it (Groq)";
+    parsed._modelUsed = "llama-3.1-8b-instant (Groq)";
 
     return res.status(200).json(parsed);
   } catch (err) {
