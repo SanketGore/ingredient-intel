@@ -13,7 +13,6 @@ export default function IngredientAnalyzer() {
   const [dragOver, setDragOver]         = useState(false);
   const fileRef = useRef();
 
-  // ── OCR via Tesseract.js ──────────────────────────────────────────────────
   const extractTextFromImage = async (file) => {
     setOcring(true);
     setOcrProgress(0);
@@ -21,15 +20,12 @@ export default function IngredientAnalyzer() {
     try {
       const worker = await createWorker("eng", 1, {
         logger: (m) => {
-          if (m.status === "recognizing text") {
-            setOcrProgress(Math.round(m.progress * 100));
-          }
+          if (m.status === "recognizing text") setOcrProgress(Math.round(m.progress * 100));
         }
       });
       const { data: { text } } = await worker.recognize(file);
       await worker.terminate();
-      const cleaned = text.replace(/\n+/g, " ").replace(/\s+/g, " ").trim();
-      setInput(cleaned);
+      setInput(text.replace(/\n+/g, " ").replace(/\s+/g, " ").trim());
       setOcrProgress(100);
     } catch (err) {
       setError("OCR failed. Please type the ingredients manually.");
@@ -38,7 +34,6 @@ export default function IngredientAnalyzer() {
     }
   };
 
-  // ── Image upload handler ──────────────────────────────────────────────────
   const handleImageUpload = useCallback((file) => {
     if (!file || !file.type.startsWith("image/")) return;
     const reader = new FileReader();
@@ -61,16 +56,9 @@ export default function IngredientAnalyzer() {
     if (fileRef.current) fileRef.current.value = "";
   };
 
-  // ── Analyze via Groq ──────────────────────────────────────────────────────
   const analyze = async () => {
-    if (!input.trim()) {
-      setError("Please enter or extract an ingredient list first.");
-      return;
-    }
-    setLoading(true);
-    setError("");
-    setResult(null);
-
+    if (!input.trim()) { setError("Please enter or extract an ingredient list first."); return; }
+    setLoading(true); setError(""); setResult(null);
     try {
       const response = await fetch("/api/analyze", {
         method: "POST",
@@ -88,21 +76,39 @@ export default function IngredientAnalyzer() {
     }
   };
 
-  // ── Style helpers ─────────────────────────────────────────────────────────
-  const scoreColor  = (s) => s >= 70 ? "#22c55e" : s >= 40 ? "#f59e0b" : "#ef4444";
-  const flagDot     = (f) => f === "green" ? "#22c55e" : f === "yellow" ? "#f59e0b" : "#ef4444";
-  const flagBg      = (f) => f === "green" ? "#f0fdf4" : f === "yellow" ? "#fffbeb" : "#fef2f2";
-  const flagBorder  = (f) => f === "green" ? "#bbf7d0" : f === "yellow" ? "#fde68a" : "#fecaca";
-  const suitIcon    = (v) => v === true ? "✓" : v === false ? "✗" : "—";
-  const suitColor   = (v) => v === true ? "#16a34a" : v === false ? "#dc2626" : "#9ca3af";
+  // ── Style helpers ──────────────────────────────────────────────────────────
+  const scoreColor   = (s) => s >= 70 ? "#22c55e" : s >= 40 ? "#f59e0b" : "#ef4444";
+  const flagDot      = (f) => f === "green" ? "#22c55e" : f === "yellow" ? "#f59e0b" : "#ef4444";
+  const flagBg       = (f) => f === "green" ? "#f0fdf4" : f === "yellow" ? "#fffbeb" : "#fef2f2";
+  const flagBorder   = (f) => f === "green" ? "#bbf7d0" : f === "yellow" ? "#fde68a" : "#fecaca";
+  const kpiColor     = (l) => l === "good" ? "#22c55e" : l === "warning" ? "#f59e0b" : "#ef4444";
+  const kpiBg        = (l) => l === "good" ? "#f0fdf4" : l === "warning" ? "#fffbeb" : "#fef2f2";
+  const kpiBorder    = (l) => l === "good" ? "#bbf7d0" : l === "warning" ? "#fde68a" : "#fecaca";
+  const suitIcon     = (v) => v === true ? "✓" : v === false ? "✗" : "—";
+  const suitColor    = (v) => v === true ? "#16a34a" : v === false ? "#dc2626" : "#9ca3af";
   const processColor = (level) => {
     if (level?.includes("Ultra"))    return { bg: "#fef2f2", text: "#dc2626" };
     if (level?.includes("Highly"))   return { bg: "#fff7ed", text: "#ea580c" };
     if (level?.includes("Moderate")) return { bg: "#fefce8", text: "#ca8a04" };
     return { bg: "#f0fdf4", text: "#16a34a" };
   };
+  const productIcon = (type) => {
+    const icons = { food: "🍽️", beverage: "🥤", cosmetic: "💄", supplement: "💊", medicine: "🏥", other: "📦" };
+    return icons[type] || "📦";
+  };
+  const contextBg = (type) => {
+    const bgs = { food: "#f0fdf4", beverage: "#eff6ff", cosmetic: "#fdf4ff", supplement: "#fff7ed", medicine: "#fef2f2", other: "#f8fafc" };
+    return bgs[type] || "#f8fafc";
+  };
+  const contextBorder = (type) => {
+    const borders = { food: "#bbf7d0", beverage: "#bfdbfe", cosmetic: "#e9d5ff", supplement: "#fed7aa", medicine: "#fecaca", other: "#e2e8f0" };
+    return borders[type] || "#e2e8f0";
+  };
+  const contextText = (type) => {
+    const texts = { food: "#166534", beverage: "#1e40af", cosmetic: "#6b21a8", supplement: "#c2410c", medicine: "#991b1b", other: "#475569" };
+    return texts[type] || "#475569";
+  };
 
-  // ── Score Ring ────────────────────────────────────────────────────────────
   const ScoreRing = ({ score, label }) => {
     const r = 32, size = 80, circ = 2 * Math.PI * r;
     const fill = (score / 100) * circ;
@@ -120,32 +126,38 @@ export default function IngredientAnalyzer() {
             {score}
           </text>
         </svg>
-        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#94a3b8" }}>
-          {label}
-        </span>
+        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#94a3b8" }}>{label}</span>
       </div>
     );
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  const tabs = [
+    { id: "overview",     label: "📊 Overview"    },
+    { id: "kpis",        label: "📈 KPIs"         },
+    { id: "ingredients", label: "🧪 Ingredients"  },
+    { id: "advice",      label: "💡 Advice"       },
+    ...(result?.alternatives?.length > 0 ? [{ id: "alternatives", label: "✨ Alternatives" }] : [])
+  ];
+
   return (
     <div style={{ fontFamily: "'DM Sans', sans-serif", minHeight: "100vh", background: "#f1f5f9", color: "#1e293b" }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=Instrument+Serif&display=swap" rel="stylesheet" />
       <style>{`
         * { box-sizing: border-box; }
-        @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
-        @keyframes spin   { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
-        @keyframes pulse  { 0%,100%{opacity:1} 50%{opacity:0.4} }
-        .ing-card { transition: transform 0.15s; }
-        .ing-card:hover { transform: translateX(3px); }
+        @keyframes fadeUp { from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)} }
+        @keyframes spin   { from{transform:rotate(0deg)}to{transform:rotate(360deg)} }
+        @keyframes pulse  { 0%,100%{opacity:1}50%{opacity:0.4} }
+        .ing-card:hover { transform: translateX(3px); transition: transform 0.15s; }
         .tab-btn:hover { background: #f1f5f9 !important; }
+        .kpi-card:hover { transform: translateY(-2px); transition: transform 0.15s; }
+        .alt-card:hover { transform: translateY(-2px); transition: transform 0.15s; }
       `}</style>
 
       {/* Header */}
       <div style={{ background: "linear-gradient(135deg,#0f172a 0%,#1a3050 50%,#0f172a 100%)", padding: "32px 24px 28px", textAlign: "center" }}>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(99,179,237,0.12)", border: "1px solid rgba(99,179,237,0.2)", borderRadius: 20, padding: "4px 12px", marginBottom: 14 }}>
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#34d399", display: "inline-block", animation: "pulse 2s infinite" }} />
-          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", color: "#7dd3fc", textTransform: "uppercase" }}>Gemma 2 · Groq Cloud</span>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", color: "#7dd3fc", textTransform: "uppercase" }}>Llama 3.1 · Groq Cloud</span>
         </div>
         <h1 style={{ fontFamily: "'Instrument Serif', serif", fontSize: 36, fontWeight: 400, color: "#fff", margin: 0, lineHeight: 1.1 }}>Ingredient Intel</h1>
         <p style={{ color: "#64748b", fontSize: 13, marginTop: 8, marginBottom: 0, fontWeight: 500 }}>Decode what's really in your food, drinks & cosmetics</p>
@@ -155,27 +167,17 @@ export default function IngredientAnalyzer() {
 
         {/* Input Card */}
         <div style={{ background: "#fff", borderRadius: 18, padding: 20, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0", marginBottom: 14 }}>
-
-          {/* Image Upload */}
-          <label style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#94a3b8", display: "block", marginBottom: 8 }}>
-            Upload Label Photo
-          </label>
+          <label style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#94a3b8", display: "block", marginBottom: 8 }}>Upload Label Photo</label>
           <div
             onDrop={handleDrop}
             onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
             onClick={() => !ocring && fileRef.current.click()}
-            style={{
-              border: `2px dashed ${dragOver ? "#3b82f6" : "#cbd5e1"}`,
-              borderRadius: 12, overflow: "hidden", cursor: ocring ? "wait" : "pointer",
-              background: dragOver ? "#eff6ff" : "#f8fafc",
-              transition: "all 0.2s", padding: imagePreview ? 0 : "18px 16px", textAlign: "center", marginBottom: 14
-            }}
+            style={{ border: `2px dashed ${dragOver ? "#3b82f6" : "#cbd5e1"}`, borderRadius: 12, overflow: "hidden", cursor: ocring ? "wait" : "pointer", background: dragOver ? "#eff6ff" : "#f8fafc", transition: "all 0.2s", padding: imagePreview ? 0 : "18px 16px", textAlign: "center", marginBottom: 14 }}
           >
             {imagePreview ? (
               <div style={{ position: "relative" }}>
                 <img src={imagePreview} alt="Label" style={{ width: "100%", maxHeight: 200, objectFit: "contain", display: "block", borderRadius: 10 }} />
-                {/* OCR progress overlay */}
                 {ocring && (
                   <div style={{ position: "absolute", inset: 0, background: "rgba(15,23,42,0.75)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, borderRadius: 10 }}>
                     <div style={{ fontSize: 13, color: "#fff", fontWeight: 600 }}>Extracting text… {ocrProgress}%</div>
@@ -184,9 +186,7 @@ export default function IngredientAnalyzer() {
                     </div>
                   </div>
                 )}
-                {!ocring && (
-                  <button onClick={clearImage} style={{ position: "absolute", top: 8, right: 8, background: "rgba(15,23,42,0.7)", color: "#fff", border: "none", borderRadius: "50%", width: 28, height: 28, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
-                )}
+                {!ocring && <button onClick={clearImage} style={{ position: "absolute", top: 8, right: 8, background: "rgba(15,23,42,0.7)", color: "#fff", border: "none", borderRadius: "50%", width: 28, height: 28, cursor: "pointer", fontSize: 14 }}>✕</button>}
               </div>
             ) : (
               <>
@@ -198,44 +198,21 @@ export default function IngredientAnalyzer() {
           </div>
           <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => handleImageUpload(e.target.files[0])} />
 
-          {/* Text Input */}
           <label style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#94a3b8", display: "block", marginBottom: 8 }}>
             {imagePreview ? "Extracted Text — Review & Edit if Needed" : "Or Paste Ingredients Manually"}
           </label>
           <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="e.g. Water, Sugar, Modified Corn Starch, Sodium Benzoate, Citric Acid, Retinol, Niacinamide..."
+            value={input} onChange={(e) => setInput(e.target.value)}
+            placeholder="Paste ingredient list here e.g. Water, Sugar, Modified Corn Starch, Sodium Benzoate... or Aqua, Glycerin, Retinol, Niacinamide..."
             rows={4}
-            style={{
-              width: "100%", border: "1.5px solid #e2e8f0", borderRadius: 10,
-              padding: "11px 13px", fontSize: 14, resize: "vertical", color: "#334155",
-              background: ocring ? "#f8fafc" : "#fff", fontFamily: "inherit", lineHeight: 1.6,
-              transition: "border-color 0.2s"
-            }}
+            style={{ width: "100%", border: "1.5px solid #e2e8f0", borderRadius: 10, padding: "11px 13px", fontSize: 14, resize: "vertical", color: "#334155", background: ocring ? "#f8fafc" : "#fff", fontFamily: "inherit", lineHeight: 1.6, transition: "border-color 0.2s" }}
             onFocus={(e) => e.target.style.borderColor = "#3b82f6"}
             onBlur={(e)  => e.target.style.borderColor = "#e2e8f0"}
             readOnly={ocring}
           />
-          {ocring && (
-            <div style={{ fontSize: 12, color: "#3b82f6", marginTop: 6, fontWeight: 600 }}>
-              ⏳ Reading image text… {ocrProgress}%
-            </div>
-          )}
+          {ocring && <div style={{ fontSize: 12, color: "#3b82f6", marginTop: 6, fontWeight: 600 }}>⏳ Reading image text… {ocrProgress}%</div>}
 
-          <button
-            onClick={analyze}
-            disabled={loading || ocring}
-            style={{
-              marginTop: 14, width: "100%", padding: "14px", borderRadius: 11, border: "none",
-              background: (loading || ocring) ? "#94a3b8" : "linear-gradient(135deg,#1d4ed8 0%,#2563eb 100%)",
-              color: "#fff", fontSize: 15, fontWeight: 700,
-              cursor: (loading || ocring) ? "not-allowed" : "pointer",
-              letterSpacing: "0.02em", fontFamily: "inherit",
-              boxShadow: (loading || ocring) ? "none" : "0 4px 14px rgba(37,99,235,0.3)",
-              transition: "all 0.2s"
-            }}
-          >
+          <button onClick={analyze} disabled={loading || ocring} style={{ marginTop: 14, width: "100%", padding: "14px", borderRadius: 11, border: "none", background: (loading || ocring) ? "#94a3b8" : "linear-gradient(135deg,#1d4ed8 0%,#2563eb 100%)", color: "#fff", fontSize: 15, fontWeight: 700, cursor: (loading || ocring) ? "not-allowed" : "pointer", letterSpacing: "0.02em", fontFamily: "inherit", boxShadow: (loading || ocring) ? "none" : "0 4px 14px rgba(37,99,235,0.3)", transition: "all 0.2s" }}>
             {loading ? "Analyzing…" : ocring ? `Extracting text… ${ocrProgress}%` : "🔬 Analyze Ingredients"}
           </button>
           {error && <div style={{ marginTop: 10, color: "#ef4444", fontSize: 13, textAlign: "center", fontWeight: 500 }}>{error}</div>}
@@ -245,8 +222,8 @@ export default function IngredientAnalyzer() {
         {loading && (
           <div style={{ background: "#fff", borderRadius: 18, padding: 28, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0", textAlign: "center" }}>
             <div style={{ fontSize: 36, marginBottom: 12, display: "inline-block", animation: "spin 2.5s linear infinite" }}>⚗️</div>
-            <div style={{ fontWeight: 700, color: "#1e293b", fontSize: 15 }}>Gemma is decoding your ingredients…</div>
-            <div style={{ color: "#94a3b8", fontSize: 13, marginTop: 5 }}>Cross-referencing nutritional & cosmetic science</div>
+            <div style={{ fontWeight: 700, color: "#1e293b", fontSize: 15 }}>Analyzing your ingredients…</div>
+            <div style={{ color: "#94a3b8", fontSize: 13, marginTop: 5 }}>Detecting product type and running contextual analysis</div>
           </div>
         )}
 
@@ -254,11 +231,19 @@ export default function IngredientAnalyzer() {
         {result && (
           <div style={{ animation: "fadeUp 0.4s ease" }}>
 
+            {/* Context Banner */}
+            <div style={{ background: contextBg(result.productType), border: `1px solid ${contextBorder(result.productType)}`, borderRadius: 12, padding: "10px 14px", marginBottom: 12, display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 22 }}>{productIcon(result.productType)}</span>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", color: contextText(result.productType) }}>{result.productType} detected</div>
+                <div style={{ fontSize: 12, color: "#475569", marginTop: 2 }}>{result.analysisContext}</div>
+              </div>
+            </div>
+
             {/* Score Card */}
             <div style={{ background: "#fff", borderRadius: 18, padding: 20, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0", marginBottom: 12 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18, gap: 12 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", color: "#94a3b8", marginBottom: 4 }}>{result.productType}</div>
                   <div style={{ fontSize: 14, color: "#334155", lineHeight: 1.5, fontWeight: 500 }}>{result.verdict}</div>
                 </div>
                 <div style={{ ...processColor(result.processingLevel), fontSize: 10, fontWeight: 800, padding: "5px 10px", borderRadius: 20, letterSpacing: "0.05em", whiteSpace: "nowrap", flexShrink: 0 }}>
@@ -276,7 +261,7 @@ export default function IngredientAnalyzer() {
             <div style={{ background: "#fff", borderRadius: 18, padding: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0", marginBottom: 12 }}>
               <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "#94a3b8", marginBottom: 12 }}>Suitability</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                {Object.entries(result.suitableFor).map(([key, val]) => (
+                {Object.entries(result.suitableFor || {}).map(([key, val]) => (
                   <div key={key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 9, background: "#f8fafc", border: "1px solid #f1f5f9" }}>
                     <span style={{ fontSize: 16, fontWeight: 800, color: suitColor(val) }}>{suitIcon(val)}</span>
                     <span style={{ fontSize: 13, color: "#475569", fontWeight: 500, textTransform: "capitalize" }}>{key.replace(/([A-Z])/g, " $1").trim()}</span>
@@ -287,21 +272,17 @@ export default function IngredientAnalyzer() {
 
             {/* Tabs */}
             <div style={{ background: "#fff", borderRadius: 18, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0", overflow: "hidden" }}>
-              <div style={{ display: "flex", borderBottom: "1px solid #f1f5f9", background: "#f8fafc" }}>
-                {[{ id: "overview", label: "📊 Overview" }, { id: "ingredients", label: "🧪 Ingredients" }, { id: "advice", label: "💡 Advice" }].map(tab => (
-                  <button key={tab.id} className="tab-btn" onClick={() => setActiveTab(tab.id)} style={{
-                    flex: 1, padding: "12px 6px", border: "none",
-                    background: activeTab === tab.id ? "#fff" : "transparent",
-                    color: activeTab === tab.id ? "#1d4ed8" : "#64748b",
-                    fontWeight: activeTab === tab.id ? 700 : 500,
-                    fontSize: 12, cursor: "pointer", letterSpacing: "0.04em",
-                    borderBottom: activeTab === tab.id ? "2px solid #2563eb" : "2px solid transparent",
-                    transition: "all 0.15s", fontFamily: "inherit"
-                  }}>{tab.label}</button>
+              <div style={{ display: "flex", borderBottom: "1px solid #f1f5f9", background: "#f8fafc", overflowX: "auto" }}>
+                {tabs.map(tab => (
+                  <button key={tab.id} className="tab-btn" onClick={() => setActiveTab(tab.id)} style={{ flexShrink: 0, flex: 1, padding: "12px 6px", border: "none", background: activeTab === tab.id ? "#fff" : "transparent", color: activeTab === tab.id ? "#1d4ed8" : "#64748b", fontWeight: activeTab === tab.id ? 700 : 500, fontSize: 11, cursor: "pointer", letterSpacing: "0.04em", borderBottom: activeTab === tab.id ? "2px solid #2563eb" : "2px solid transparent", transition: "all 0.15s", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                    {tab.label}
+                  </button>
                 ))}
               </div>
 
               <div style={{ padding: 16 }}>
+
+                {/* Overview */}
                 {activeTab === "overview" && (
                   <div>
                     {result.positives?.length > 0 && (
@@ -327,6 +308,25 @@ export default function IngredientAnalyzer() {
                   </div>
                 )}
 
+                {/* KPIs */}
+                {activeTab === "kpis" && (
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>
+                      Key Performance Indicators — {result.productType}
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      {result.kpis?.map((kpi, i) => (
+                        <div key={i} className="kpi-card" style={{ padding: "12px", borderRadius: 12, background: kpiBg(kpi.level), border: `1px solid ${kpiBorder(kpi.level)}` }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>{kpi.label}</div>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: kpiColor(kpi.level), marginBottom: 4 }}>{kpi.value}</div>
+                          <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.4 }}>{kpi.note}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Ingredients */}
                 {activeTab === "ingredients" && (
                   <div>
                     <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
@@ -352,6 +352,7 @@ export default function IngredientAnalyzer() {
                   </div>
                 )}
 
+                {/* Advice */}
                 {activeTab === "advice" && (
                   <div>
                     <div style={{ fontSize: 11, fontWeight: 800, color: "#1d4ed8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>💡 Recommendations</div>
@@ -363,11 +364,31 @@ export default function IngredientAnalyzer() {
                     ))}
                   </div>
                 )}
+
+                {/* Alternatives */}
+                {activeTab === "alternatives" && (
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: "#7c3aed", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>✨ Cleaner Alternatives</div>
+                    <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 14 }}>Suggested because overall score is below 70</div>
+                    {result.alternatives?.map((alt, i) => (
+                      <div key={i} className="alt-card" style={{ padding: "14px", borderRadius: 12, marginBottom: 10, background: "#faf5ff", border: "1px solid #e9d5ff" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
+                          <span style={{ fontSize: 14, fontWeight: 700, color: "#4c1d95" }}>{alt.name}</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, background: alt.type === "brand" ? "#7c3aed" : "#2563eb", color: "#fff", padding: "2px 8px", borderRadius: 10, textTransform: "uppercase", letterSpacing: "0.06em", flexShrink: 0 }}>
+                            {alt.type}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 12, color: "#6d28d9", lineHeight: 1.5 }}>{alt.reason}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
               </div>
             </div>
 
             <div style={{ textAlign: "center", fontSize: 11, color: "#94a3b8", marginTop: 14, lineHeight: 1.6 }}>
-              Analysis by Gemma 2 9B via Groq · For clinical decisions, consult a qualified professional.
+              Analysis by Llama 3.1 8B via Groq · For clinical decisions, consult a qualified professional.
             </div>
           </div>
         )}
