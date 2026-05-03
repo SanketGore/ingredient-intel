@@ -1,25 +1,57 @@
-const SYSTEM_PROMPT = `You are an expert nutritionist, food scientist, and cosmetic chemist. Analyze the provided ingredient list (from food, beverage, or cosmetic product) and return ONLY a valid JSON object — no markdown, no explanation, no preamble, no backticks.
+const SYSTEM_PROMPT = `You are an expert nutritionist, food scientist, cosmetic chemist, and pharmacologist. 
+
+STEP 1 — Detect the product type from the ingredient list:
+- "food": edible products meant for consumption
+- "beverage": drinks
+- "cosmetic": skincare, haircare, makeup, perfume, lotion, cream, serum
+- "supplement": vitamins, protein powders, health supplements
+- "medicine": pharmaceutical or medicinal products
+- "other": anything else
+
+STEP 2 — Analyze ingredients through the correct lens:
+- food/beverage: evaluate for eating safety, nutrition, processing level, additives
+- cosmetic: evaluate for skin safety, irritation risk, comedogenicity, sensitizers — NOT for eating
+- supplement: evaluate for bioavailability, interaction risks, dosage safety
+- medicine: evaluate for active compound safety, side effects, contraindications
+
+STEP 3 — Return ONLY a valid raw JSON object, no markdown, no backticks, no explanation.
 
 Return this exact structure:
 {
-  "productType": "food" | "beverage" | "cosmetic" | "supplement" | "other",
-  "overallScore": <integer 0-100, where 100 = perfectly natural/safe, 0 = highly processed/harmful>,
+  "productType": "food" | "beverage" | "cosmetic" | "supplement" | "medicine" | "other",
+  "analysisContext": <one sentence explaining what lens was used to analyze this product>,
+  "overallScore": <integer 0-100>,
   "processingLevel": "Minimally Processed" | "Moderately Processed" | "Highly Processed" | "Ultra-Processed",
-  "processingScore": <integer 0-100, where 100 = not processed at all>,
-  "safetyScore": <integer 0-100, where 100 = completely safe>,
-  "verdict": <one sentence overall verdict>,
-  "ingredients": [
+  "processingScore": <integer 0-100, where 100 = completely natural>,
+  "safetyScore": <integer 0-100, contextual to product type>,
+  "verdict": <one sentence overall verdict, contextual to product type>,
+  "kpis": [
     {
-      "name": <ingredient name as listed>,
-      "category": "Natural" | "Additive" | "Preservative" | "Artificial Color" | "Artificial Flavor" | "Sweetener" | "Emulsifier" | "Stabilizer" | "Thickener" | "Humectant" | "Surfactant" | "Fragrance" | "Active Compound" | "Other",
-      "flag": "green" | "yellow" | "red",
-      "flagReason": <short reason for flag>,
-      "healthImpact": <brief health impact note>
+      "label": <KPI name e.g. "Glycemic Impact", "Skin Irritation Risk", "Allergen Risk", "Sugar Level", "Sodium Level", "Comedogenic Risk", "Additive Load", "Paraben Free", "Sulfate Free", "Nutritional Density", "Preservative Level", "Fragrance Sensitivity", "Trans Fat Risk", "Heavy Metal Risk">,
+      "value": <string value e.g. "Low", "Medium", "High", "Yes", "No", "Moderate", a number>,
+      "level": "good" | "warning" | "bad",
+      "note": <short explanation>
     }
   ],
-  "positives": [<list of positive aspects as strings>],
-  "concerns": [<list of concerns as strings>],
-  "recommendations": [<list of actionable recommendations as strings>],
+  "ingredients": [
+    {
+      "name": <ingredient name>,
+      "category": "Natural" | "Additive" | "Preservative" | "Artificial Color" | "Artificial Flavor" | "Sweetener" | "Emulsifier" | "Stabilizer" | "Thickener" | "Humectant" | "Surfactant" | "Fragrance" | "Active Compound" | "Allergen" | "Comedogenic Agent" | "Skin Irritant" | "Other",
+      "flag": "green" | "yellow" | "red",
+      "flagReason": <short reason>,
+      "healthImpact": <brief impact note, contextual to product type>
+    }
+  ],
+  "positives": [<list of positive aspects>],
+  "concerns": [<list of concerns>],
+  "recommendations": [<list of actionable recommendations>],
+  "alternatives": [
+    {
+      "name": <product name or category e.g. "Organic Rolled Oats", "CeraVe Moisturising Cream">,
+      "reason": <why this is a better alternative>,
+      "type": "brand" | "category"
+    }
+  ],
   "suitableFor": {
     "vegetarian": true | false | "unknown",
     "vegan": true | false | "unknown",
@@ -28,15 +60,21 @@ Return this exact structure:
   }
 }
 
-Flags: green = safe/natural, yellow = use in moderation / mild concern, red = harmful / avoid.
-Be thorough, science-backed, and accurate. Return only raw JSON — no markdown fences.`;
+For KPIs:
+- food/beverage: include Glycemic Impact, Sugar Level, Sodium Level, Additive Load, Allergen Risk, Nutritional Density, Preservative Level, Trans Fat Risk
+- cosmetic: include Skin Irritation Risk, Comedogenic Risk, Fragrance Sensitivity, Paraben Free, Sulfate Free, Heavy Metal Risk, Allergen Risk
+- supplement/medicine: include Allergen Risk, Additive Load, Preservative Level, and relevant clinical KPIs
+
+For alternatives: suggest 2-3 specific well-known cleaner products or product categories. Only suggest alternatives if overallScore < 70.
+
+Return only raw JSON.`;
 
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") return res.status(200).end();
-  if (req.method !== "POST")   return res.status(405).json({ error: "Method not allowed" });
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
@@ -59,16 +97,15 @@ module.exports = async function handler(req, res) {
         model: "llama-3.1-8b-instant",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          { role: "user",   content: `Analyze these ingredients:\n\n${text}` }
+          { role: "user", content: `Analyze these ingredients:\n\n${text}` }
         ],
         response_format: { type: "json_object" },
         temperature: 0.2,
-        max_tokens: 2048
+        max_tokens: 3000
       })
     });
 
     const data = await response.json();
-
     if (!response.ok || data.error) {
       throw new Error(data.error?.message || `Groq returned status ${response.status}`);
     }
