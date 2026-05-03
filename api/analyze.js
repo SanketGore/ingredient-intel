@@ -39,7 +39,9 @@ Return this exact structure:
       "category": "Natural" | "Additive" | "Preservative" | "Artificial Color" | "Artificial Flavor" | "Sweetener" | "Emulsifier" | "Stabilizer" | "Thickener" | "Humectant" | "Surfactant" | "Fragrance" | "Active Compound" | "Allergen" | "Comedogenic Agent" | "Skin Irritant" | "Other",
       "flag": "green" | "yellow" | "red",
       "flagReason": <short reason>,
-      "healthImpact": <brief impact note, contextual to product type>
+      "healthImpact": <brief impact note, contextual to product type>,
+      "composition": <for Preservative, Artificial Color, Artificial Flavor, Sweetener, Emulsifier, Surfactant, Fragrance, Additive categories only — explain what this ingredient is actually made of or derived from in 1-2 sentences. For Natural ingredients set this to null>,
+      "sideEffects": <for Preservative, Artificial Color, Artificial Flavor, Sweetener, Emulsifier, Surfactant, Fragrance, Additive, Skin Irritant, Comedogenic Agent categories only — list known side effects or risks in 1-2 sentences. For clearly safe Natural ingredients set this to null>
     }
   ],
   "positives": [<list of positive aspects>],
