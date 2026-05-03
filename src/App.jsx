@@ -388,6 +388,18 @@ export default function IngredientAnalyzer() {
                         </div>
                         <div style={{ fontSize:11, color:"#64748b", marginBottom:4, paddingLeft:15 }}>{ing.flagReason}</div>
                         <div style={{ fontSize:12, color:"#475569", lineHeight:1.5, paddingLeft:15 }}>{ing.healthImpact}</div>
+                        {ing.composition && (
+                          <div style={{ marginTop:8, paddingLeft:15 }}>
+                            <div style={{ fontSize:10, fontWeight:700, color:"#7c3aed", letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:3 }}>What it's made of</div>
+                            <div style={{ fontSize:12, color:"#4c1d95", lineHeight:1.5, background:"#faf5ff", border:"1px solid #e9d5ff", borderRadius:7, padding:"6px 10px" }}>{ing.composition}</div>
+                          </div>
+                        )}
+                        {ing.sideEffects && (
+                          <div style={{ marginTop:6, paddingLeft:15 }}>
+                            <div style={{ fontSize:10, fontWeight:700, color:"#b45309", letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:3 }}>Known side effects</div>
+                            <div style={{ fontSize:12, color:"#78350f", lineHeight:1.5, background:"#fffbeb", border:"1px solid #fde68a", borderRadius:7, padding:"6px 10px" }}>{ing.sideEffects}</div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
